@@ -21,7 +21,7 @@
  * Run a shell script.
  */
 
-#if !( defined(_WIN32) || defined(__WIN32__) || defined(WIN32)) // Sorry, MS Windows users, this plugin won't work for you
+#if !( defined(_WIN32) || defined(__WIN32__) || defined(WIN32 ) ) // Sorry, MS Windows users, this plugin won't work for you
 
 #include "RunScript.h"
 #include "ofxsMacros.h"
@@ -54,27 +54,30 @@
 
 using namespace OFX;
 
+using std::string;
+using std::vector;
+
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #define kPluginName "RunScriptOFX"
 #define kPluginGrouping "Image"
 #define kPluginDescription \
-"Run a script with the given arguments.\n" \
-"This is mostly useful to execute an external program on a set of input images files, which outputs image files.\n" \
-"Writers should be connected to each input, so that the image files are written before running the script, and the output of this node should be fed into one or more Readers, which read the images written by the script.\n" \
-"Sample node graph:\n" \
-"... +- WriteOIIO(scriptinput#####.png) +- RunScript(processes scriptinput#####.png, output is scriptoutput#####.png) +- ReadOIIO(scriptoutput#####.png) +- ...\n" \
-"Keep in mind that the input and output files are never removed in the above graph.\n" \
-"The output of RunScript is a copy of its first input, so that it can be used to execute a script at some point, e.g. to cleanup temporary files, as in:\n" \
-"... +- WriteOIIO(scriptinput#####.png) +- RunScript(processes scriptinput#####.png, output is scriptoutput#####.png) +- ReadOIIO(scriptoutput#####.png) +- RunScript(deletes temporary files scriptinput#####.png and scriptoutput#####.png, optional) +- ...\n" \
-"Each argument may be:\n" \
-"- A filename (connect an input to an upstream Writer, and link the parameter to the output filename of this writer, or link to the input filename of a downstream Reader)\n" \
-"- A floating-point value (which can be linked to any plugin)\n" \
-"- An integer\n" \
-"- A string\n" \
-"Under Unix, the script should begin with a traditional shebang line, e.g. '#!/bin/sh' or '#!/usr/bin/env python'\n" \
-"The arguments can be accessed as usual from the script (in a Unix shell-script, argument 1 would be accessed as \"$1\" - use double quotes to avoid problems with spaces).\n" \
-"This plugin uses pstream (http://pstreams.sourceforge.net), which is distributed under the GNU LGPLv3.\n"
+    "Run a script with the given arguments.\n" \
+    "This is mostly useful to execute an external program on a set of input images files, which outputs image files.\n" \
+    "Writers should be connected to each input, so that the image files are written before running the script, and the output of this node should be fed into one or more Readers, which read the images written by the script.\n" \
+    "Sample node graph:\n" \
+    "... +- WriteOIIO(scriptinput#####.png) +- RunScript(processes scriptinput#####.png, output is scriptoutput#####.png) +- ReadOIIO(scriptoutput#####.png) +- ...\n" \
+    "Keep in mind that the input and output files are never removed in the above graph.\n" \
+    "The output of RunScript is a copy of its first input, so that it can be used to execute a script at some point, e.g. to cleanup temporary files, as in:\n" \
+    "... +- WriteOIIO(scriptinput#####.png) +- RunScript(processes scriptinput#####.png, output is scriptoutput#####.png) +- ReadOIIO(scriptoutput#####.png) +- RunScript(deletes temporary files scriptinput#####.png and scriptoutput#####.png, optional) +- ...\n" \
+    "Each argument may be:\n" \
+    "- A filename (connect an input to an upstream Writer, and link the parameter to the output filename of this writer, or link to the input filename of a downstream Reader)\n" \
+    "- A floating-point value (which can be linked to any plugin)\n" \
+    "- An integer\n" \
+    "- A string\n" \
+    "Under Unix, the script should begin with a traditional shebang line, e.g. '#!/bin/sh' or '#!/usr/bin/env python'\n" \
+    "The arguments can be accessed as usual from the script (in a Unix shell-script, argument 1 would be accessed as \"$1\" - use double quotes to avoid problems with spaces).\n" \
+    "This plugin uses pstream (http://pstreams.sourceforge.net), which is distributed under the GNU LGPLv3.\n"
 
 #define kPluginIdentifier "fr.inria.openfx.RunScript"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
@@ -115,8 +118,9 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #define kParamScript                  "script"
 #define kParamScriptLabel             "Script"
-#define kParamScriptHint              "Contents of the script. Under Unix, the script should begin with a traditional shebang line, e.g. '#!/bin/sh' or '#!/usr/bin/env python'\n" \
-                                                     "The arguments can be accessed as usual from the script (in a Unix shell-script, argument 1 would be accessed as \"$1\" - use double quotes to avoid problems with spaces)."
+#define kParamScriptHint \
+    "Contents of the script. Under Unix, the script should begin with a traditional shebang line, e.g. '#!/bin/sh' or '#!/usr/bin/env python'\n" \
+    "The arguments can be accessed as usual from the script (in a Unix shell-script, argument 1 would be accessed as \"$1\" - use double quotes to avoid problems with spaces)."
 
 #define kParamValidate                  "validate"
 #define kParamValidateLabel             "Validate"
@@ -125,19 +129,19 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 enum ERunScriptPluginParamType
 {
     eRunScriptPluginParamTypeFilename = 0,
-	eRunScriptPluginParamTypeString,
+    eRunScriptPluginParamTypeString,
     eRunScriptPluginParamTypeDouble,
-	eRunScriptPluginParamTypeInteger
+    eRunScriptPluginParamTypeInteger
 };
 
 static
-std::string
+string
 unsignedToString(unsigned i)
 {
     if (i == 0) {
         return "0";
     }
-    std::string nb;
+    string nb;
     for (unsigned j = i; j != 0; j /= 10) {
         nb = (char)( '0' + (j % 10) ) + nb;
     }
@@ -145,60 +149,63 @@ unsignedToString(unsigned i)
     return nb;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class RunScriptPlugin : public OFX::ImageEffect {
+class RunScriptPlugin
+    : public ImageEffect
+{
 public:
     /** @brief ctor */
     RunScriptPlugin(OfxImageEffectHandle handle);
 
     /* Override the render */
-    virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
+    virtual void render(const RenderArguments &args) OVERRIDE FINAL;
 
     /* override is identity */
-    virtual bool isIdentity(const OFX::IsIdentityArguments &/*args*/, OFX::Clip * &/*identityClip*/, double &/*identityTime*/) OVERRIDE FINAL
+    virtual bool isIdentity(const IsIdentityArguments & /*args*/,
+                            Clip * & /*identityClip*/,
+                            double & /*identityTime*/) OVERRIDE FINAL
     {
         // must clear persistent message in isIdentity, or render() is not called by Nuke after an error
         clearPersistentMessage();
+
         return false;
     }
 
     /* override changedParam */
-    virtual void changedParam(const OFX::InstanceChangedArgs &args, const std::string &paramName) OVERRIDE FINAL;
+    virtual void changedParam(const InstanceChangedArgs &args, const string &paramName) OVERRIDE FINAL;
 
     // override the rod call
-    virtual bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
+    virtual bool getRegionOfDefinition(const RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
 
     // override the roi call
-    virtual void getRegionsOfInterest(const OFX::RegionsOfInterestArguments &args, OFX::RegionOfInterestSetter &rois) OVERRIDE FINAL;
+    virtual void getRegionsOfInterest(const RegionsOfInterestArguments &args, RegionOfInterestSetter &rois) OVERRIDE FINAL;
 
 private:
     void updateVisibility(void);
 
 private:
-    OFX::Clip *_srcClip[kRunScriptPluginSourceClipCount];
-    OFX::Clip *_dstClip;
-
-    OFX::IntParam *_param_count;
-    OFX::ChoiceParam *_type[kRunScriptPluginArgumentsCount];
-    OFX::StringParam *_filename[kRunScriptPluginArgumentsCount];
-    OFX::StringParam *_string[kRunScriptPluginArgumentsCount];
-    OFX::DoubleParam *_double[kRunScriptPluginArgumentsCount];
-    OFX::IntParam *_int[kRunScriptPluginArgumentsCount];
-    OFX::StringParam *_script;
-    OFX::BooleanParam *_validate;
+    Clip *_srcClip[kRunScriptPluginSourceClipCount];
+    Clip *_dstClip;
+    IntParam *_param_count;
+    ChoiceParam *_type[kRunScriptPluginArgumentsCount];
+    StringParam *_filename[kRunScriptPluginArgumentsCount];
+    StringParam *_string[kRunScriptPluginArgumentsCount];
+    DoubleParam *_double[kRunScriptPluginArgumentsCount];
+    IntParam *_int[kRunScriptPluginArgumentsCount];
+    StringParam *_script;
+    BooleanParam *_validate;
 };
 
 RunScriptPlugin::RunScriptPlugin(OfxImageEffectHandle handle)
-: ImageEffect(handle)
+    : ImageEffect(handle)
 {
-    if (getContext() != OFX::eContextGenerator) {
+    if (getContext() != eContextGenerator) {
         for (int i = 0; i < kRunScriptPluginSourceClipCount; ++i) {
-            if (i == 0 && getContext() == OFX::eContextFilter) {
+            if ( (i == 0) && (getContext() == eContextFilter) ) {
                 _srcClip[i] = fetchClip(kOfxImageEffectSimpleSourceClipName);
             } else {
-                const std::string istr = unsignedToString(i+1);
+                const string istr = unsignedToString(i + 1);
                 _srcClip[i] = fetchClip(istr);
             }
             assert(_srcClip[i]);
@@ -210,7 +217,7 @@ RunScriptPlugin::RunScriptPlugin(OfxImageEffectHandle handle)
     _param_count = fetchIntParam(kParamCount);
 
     for (int i = 0; i < kRunScriptPluginArgumentsCount; ++i) {
-        const std::string istr = unsignedToString(i+1);
+        const string istr = unsignedToString(i + 1);
         _type[i] = fetchChoiceParam(kParamType + istr);
         _filename[i] = fetchStringParam(kParamTypeFilenameName + istr);
         _string[i] = fetchStringParam(kParamTypeStringName + istr);
@@ -226,37 +233,41 @@ RunScriptPlugin::RunScriptPlugin(OfxImageEffectHandle handle)
 }
 
 void
-RunScriptPlugin::render(const OFX::RenderArguments &args)
+RunScriptPlugin::render(const RenderArguments &args)
 {
     DBG(std::cout << "rendering time " << args.time << " scale " << args.renderScale.x << ',' << args.renderScale.y << " window " << args.renderWindow.x1 << ',' << args.renderWindow.y1 << " - " << args.renderWindow.x2 << ',' << args.renderWindow.y2 << " field " << (int)args.fieldToRender << " view " << args.renderView << std::endl);
 
-    if (!kSupportsRenderScale && (args.renderScale.x != 1. || args.renderScale.y != 1.)) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+    if ( !kSupportsRenderScale && ( (args.renderScale.x != 1.) || (args.renderScale.y != 1.) ) ) {
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
 
     bool validated;
     _validate->getValue(validated);
     if (!validated) {
-        setPersistentMessage(OFX::Message::eMessageError, "", "Validate the script before rendering/running.");
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+        setPersistentMessage(Message::eMessageError, "", "Validate the script before rendering/running.");
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
 
     // fetch images corresponding to all connected inputs,
     // since it may trigger render actions upstream
     for (int i = 0; i < kRunScriptPluginSourceClipCount; ++i) {
-        if (_srcClip[i]->isConnected()) {
-            std::auto_ptr<const OFX::Image> srcImg(_srcClip[i]->fetchImage(args.time));
-            if (!srcImg.get()) {
-                OFX::throwSuiteStatusException(kOfxStatFailed);
+        if ( _srcClip[i]->isConnected() ) {
+            std::auto_ptr<const Image> srcImg( _srcClip[i]->fetchImage(args.time) );
+            if ( !srcImg.get() ) {
+                throwSuiteStatusException(kOfxStatFailed);
+
                 return;
-           }
-            if (srcImg->getRenderScale().x != args.renderScale.x ||
-                srcImg->getRenderScale().y != args.renderScale.y ||
-                srcImg->getField() != args.fieldToRender) {
-                setPersistentMessage(OFX::Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
-                OFX::throwSuiteStatusException(kOfxStatFailed);
+            }
+            if ( (srcImg->getRenderScale().x != args.renderScale.x) ||
+                 ( srcImg->getRenderScale().y != args.renderScale.y) ||
+                 ( srcImg->getField() != args.fieldToRender) ) {
+                setPersistentMessage(Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
+                throwSuiteStatusException(kOfxStatFailed);
+
                 return;
             }
         }
@@ -266,20 +277,23 @@ RunScriptPlugin::render(const OFX::RenderArguments &args)
     // or the host may think we couldn't render.
     // Nuke executes hundreds of render() if we don't.
     if (!_dstClip) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
     assert(_dstClip);
-    std::auto_ptr<OFX::Image> dstImg(_dstClip->fetchImage(args.time));
-    if (!dstImg.get()) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+    std::auto_ptr<Image> dstImg( _dstClip->fetchImage(args.time) );
+    if ( !dstImg.get() ) {
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
-    if (dstImg->getRenderScale().x != args.renderScale.x ||
-        dstImg->getRenderScale().y != args.renderScale.y ||
-        dstImg->getField() != args.fieldToRender) {
-        setPersistentMessage(OFX::Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+    if ( (dstImg->getRenderScale().x != args.renderScale.x) ||
+         ( dstImg->getRenderScale().y != args.renderScale.y) ||
+         ( dstImg->getField() != args.fieldToRender) ) {
+        setPersistentMessage(Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
 
@@ -290,27 +304,30 @@ RunScriptPlugin::render(const OFX::RenderArguments &args)
     // coverity[secure_temp]
     int fd = mkstemp(scriptname); // modifies template
     if (fd < 0) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
-    std::string script;
+    string script;
     _script->getValue(script);
-    ssize_t s = write(fd, script.c_str(), script.size());
+    ssize_t s = write( fd, script.c_str(), script.size() );
     close(fd);
     if (s < 0) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
 
     // make the script executable
     int stat = chmod(scriptname, S_IRWXU);
     if (stat != 0) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
 
     // build the command-line
-    std::vector<std::string> argv;
+    vector<string> argv;
     argv.push_back(scriptname);
 
     int param_count;
@@ -321,56 +338,56 @@ RunScriptPlugin::render(const OFX::RenderArguments &args)
         int t_int;
         _type[i]->getValue(t_int);
         ERunScriptPluginParamType t = (ERunScriptPluginParamType)t_int;
-        OFX::ValueParam *p = NULL;
+        ValueParam *p = NULL;
         switch (t) {
-            case eRunScriptPluginParamTypeFilename: {
-                std::string s;
-                _filename[i]->getValue(s);
-                p = _filename[i];
-                DBG(std::cout << p->getName() << "=" << s);
-                argv.push_back(s);
-                break;
-            }
-            case eRunScriptPluginParamTypeString: {
-                std::string s;
-                _string[i]->getValue(s);
-                p = _string[i];
-                DBG(std::cout << p->getName() << "=" << s);
-                argv.push_back(s);
-                break;
-            }
-            case eRunScriptPluginParamTypeDouble: {
-                double v;
-                _double[i]->getValue(v);
-                p = _double[i];
-                DBG(std::cout << p->getName() << "=" << v);
-                snprintf(name, sizeof(name), "%g", v);
-                argv.push_back(name);
-                break;
-            }
-            case eRunScriptPluginParamTypeInteger: {
-                int v;
-                _int[i]->getValue(v);
-                p = _int[i];
-                DBG(std::cout << p->getName() << "=" << v);
-                snprintf(name, sizeof(name), "%d", v);
-                argv.push_back(name);
-                break;
-            }
+        case eRunScriptPluginParamTypeFilename: {
+            string s;
+            _filename[i]->getValue(s);
+            p = _filename[i];
+            DBG(std::cout << p->getName() << "=" << s);
+            argv.push_back(s);
+            break;
+        }
+        case eRunScriptPluginParamTypeString: {
+            string s;
+            _string[i]->getValue(s);
+            p = _string[i];
+            DBG(std::cout << p->getName() << "=" << s);
+            argv.push_back(s);
+            break;
+        }
+        case eRunScriptPluginParamTypeDouble: {
+            double v;
+            _double[i]->getValue(v);
+            p = _double[i];
+            DBG(std::cout << p->getName() << "=" << v);
+            snprintf(name, sizeof(name), "%g", v);
+            argv.push_back(name);
+            break;
+        }
+        case eRunScriptPluginParamTypeInteger: {
+            int v;
+            _int[i]->getValue(v);
+            p = _int[i];
+            DBG(std::cout << p->getName() << "=" << v);
+            snprintf(name, sizeof(name), "%d", v);
+            argv.push_back(name);
+            break;
+        }
         }
         if (p) {
-            DBG(std::cout << "; IsAnimating=" << (p->getIsAnimating() ? "true" : "false"));
-            DBG(std::cout << "; IsAutoKeying=" << (p->getIsAutoKeying() ? "true" : "false"));
-            DBG(std::cout << "; NumKeys=" << p->getNumKeys());
+            DBG( std::cout << "; IsAnimating=" << (p->getIsAnimating() ? "true" : "false") );
+            DBG( std::cout << "; IsAutoKeying=" << (p->getIsAutoKeying() ? "true" : "false") );
+            DBG( std::cout << "; NumKeys=" << p->getNumKeys() );
         }
         DBG(std::cout << std::endl);
     }
 
     // execute the script
-    std::vector<std::string> errors;
-    redi::ipstream in(scriptname, argv, redi::pstreambuf::pstderr|redi::pstreambuf::pstderr);
-    std::string errmsg;
-    while (std::getline(in, errmsg)) {
+    vector<string> errors;
+    redi::ipstream in(scriptname, argv, redi::pstreambuf::pstderr | redi::pstreambuf::pstderr);
+    string errmsg;
+    while ( std::getline(in, errmsg) ) {
         errors.push_back(errmsg);
         DBG(std::cout << "output: " << errmsg << std::endl);
     }
@@ -380,48 +397,52 @@ RunScriptPlugin::render(const OFX::RenderArguments &args)
 
     // now copy the first input to output
 
-    if (_dstClip->isConnected()) {
-        std::auto_ptr<OFX::Image> dstImg(_dstClip->fetchImage(args.time));
-        if (!dstImg.get()) {
-            OFX::throwSuiteStatusException(kOfxStatFailed);
+    if ( _dstClip->isConnected() ) {
+        std::auto_ptr<Image> dstImg( _dstClip->fetchImage(args.time) );
+        if ( !dstImg.get() ) {
+            throwSuiteStatusException(kOfxStatFailed);
+
             return;
         }
-        if (dstImg->getRenderScale().x != args.renderScale.x ||
-            dstImg->getRenderScale().y != args.renderScale.y ||
-            dstImg->getField() != args.fieldToRender) {
-            setPersistentMessage(OFX::Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
-            OFX::throwSuiteStatusException(kOfxStatFailed);
+        if ( (dstImg->getRenderScale().x != args.renderScale.x) ||
+             ( dstImg->getRenderScale().y != args.renderScale.y) ||
+             ( dstImg->getField() != args.fieldToRender) ) {
+            setPersistentMessage(Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
+            throwSuiteStatusException(kOfxStatFailed);
+
             return;
         }
 
-        std::auto_ptr<const OFX::Image> srcImg(_srcClip[0]->fetchImage(args.time));
+        std::auto_ptr<const Image> srcImg( _srcClip[0]->fetchImage(args.time) );
 
-        if (!srcImg.get()) {
+        if ( !srcImg.get() ) {
             // fill output with black
-            fillBlack(*this, args.renderWindow, dstImg.get());
+            fillBlack( *this, args.renderWindow, dstImg.get() );
         } else {
-            if (srcImg->getRenderScale().x != args.renderScale.x ||
-                srcImg->getRenderScale().y != args.renderScale.y ||
-                srcImg->getField() != args.fieldToRender) {
-                setPersistentMessage(OFX::Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
-                OFX::throwSuiteStatusException(kOfxStatFailed);
+            if ( (srcImg->getRenderScale().x != args.renderScale.x) ||
+                 ( srcImg->getRenderScale().y != args.renderScale.y) ||
+                 ( srcImg->getField() != args.fieldToRender) ) {
+                setPersistentMessage(Message::eMessageError, "", "OFX Host gave image with wrong scale or field properties");
+                throwSuiteStatusException(kOfxStatFailed);
+
                 return;
             }
 
             // copy the source image (the writer is a no-op)
-            copyPixels(*this, args.renderWindow, srcImg.get(), dstImg.get());
+            copyPixels( *this, args.renderWindow, srcImg.get(), dstImg.get() );
         }
     }
-
-}
+} // RunScriptPlugin::render
 
 void
-RunScriptPlugin::changedParam(const OFX::InstanceChangedArgs &args, const std::string &paramName)
+RunScriptPlugin::changedParam(const InstanceChangedArgs &args,
+                              const string &paramName)
 {
     DBG(std::cout << "changed param " << paramName << " at time " << args.time << " reason = " << (int)args.reason <<  std::endl);
 
-    if (!kSupportsRenderScale && (args.renderScale.x != 1. || args.renderScale.y != 1.)) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+    if ( !kSupportsRenderScale && ( (args.renderScale.x != 1.) || (args.renderScale.y != 1.) ) ) {
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
 
@@ -453,7 +474,7 @@ RunScriptPlugin::changedParam(const OFX::InstanceChangedArgs &args, const std::s
         clearPersistentMessage();
     } else {
         for (int i = 0; i < param_count; ++i) {
-            if (paramName == _type[i]->getName() && args.reason == OFX::eChangeUserEdit) {
+            if ( ( paramName == _type[i]->getName() ) && (args.reason == eChangeUserEdit) ) {
                 int t_int;
                 _type[i]->getValue(t_int);
                 ERunScriptPluginParamType t = (ERunScriptPluginParamType)t_int;
@@ -469,50 +490,45 @@ RunScriptPlugin::changedParam(const OFX::InstanceChangedArgs &args, const std::s
         int t_int;
         _type[i]->getValue(t_int);
         ERunScriptPluginParamType t = (ERunScriptPluginParamType)t_int;
-        OFX::ValueParam *p = NULL;
+        ValueParam *p = NULL;
         switch (t) {
-            case eRunScriptPluginParamTypeFilename:
-            {
-                std::string s;
-                _filename[i]->getValue(s);
-                p = _filename[i];
-                DBG(std::cout << p->getName() << "=" << s);
-            }
-                break;
-            case eRunScriptPluginParamTypeString:
-            {
-                std::string s;
-                _string[i]->getValue(s);
-                p = _string[i];
-                DBG(std::cout << p->getName() << "=" << s);
-            }
-                break;
-            case eRunScriptPluginParamTypeDouble:
-            {
-                double v;
-                _double[i]->getValue(v);
-                p = _double[i];
-                DBG(std::cout << p->getName() << "=" << v);
-            }
-                break;
-            case eRunScriptPluginParamTypeInteger:
-            {
-                int v;
-                _int[i]->getValue(v);
-                p = _int[i];
-                DBG(std::cout << p->getName() << "=" << v);
-            }
-                break;
+        case eRunScriptPluginParamTypeFilename: {
+            string s;
+            _filename[i]->getValue(s);
+            p = _filename[i];
+            DBG(std::cout << p->getName() << "=" << s);
+            break;
+        }
+        case eRunScriptPluginParamTypeString: {
+            string s;
+            _string[i]->getValue(s);
+            p = _string[i];
+            DBG(std::cout << p->getName() << "=" << s);
+            break;
+        }
+        case eRunScriptPluginParamTypeDouble: {
+            double v;
+            _double[i]->getValue(v);
+            p = _double[i];
+            DBG(std::cout << p->getName() << "=" << v);
+            break;
+        }
+        case eRunScriptPluginParamTypeInteger: {
+            int v;
+            _int[i]->getValue(v);
+            p = _int[i];
+            DBG(std::cout << p->getName() << "=" << v);
+            break;
+        }
         }
         if (p) {
-            DBG(std::cout << "; IsAnimating=" << (p->getIsAnimating() ? "true" : "false"));
-            DBG(std::cout << "; IsAutoKeying=" << (p->getIsAutoKeying() ? "true" : "false"));
-            DBG(std::cout << "; NumKeys=" << p->getNumKeys());
+            DBG( std::cout << "; IsAnimating=" << (p->getIsAnimating() ? "true" : "false") );
+            DBG( std::cout << "; IsAutoKeying=" << (p->getIsAutoKeying() ? "true" : "false") );
+            DBG( std::cout << "; NumKeys=" << p->getNumKeys() );
         }
         DBG(std::cout << std::endl);
     }
-
-}
+} // RunScriptPlugin::changedParam
 
 void
 RunScriptPlugin::updateVisibility(void)
@@ -521,6 +537,7 @@ RunScriptPlugin::updateVisibility(void)
     // It is not possible in Nuke to show a parameter that was set as secret/hidden in describeInContext()
 
     int param_count;
+
     _param_count->getValue(param_count);
 
     bool validated;
@@ -562,11 +579,12 @@ RunScriptPlugin::updateVisibility(void)
 
 // override the roi call
 void
-RunScriptPlugin::getRegionsOfInterest(const OFX::RegionsOfInterestArguments &args,
-                                      OFX::RegionOfInterestSetter &rois)
+RunScriptPlugin::getRegionsOfInterest(const RegionsOfInterestArguments &args,
+                                      RegionOfInterestSetter &rois)
 {
-    if (!kSupportsRenderScale && (args.renderScale.x != 1. || args.renderScale.y != 1.)) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+    if ( !kSupportsRenderScale && ( (args.renderScale.x != 1.) || (args.renderScale.y != 1.) ) ) {
+        throwSuiteStatusException(kOfxStatFailed);
+
         return;
     }
 
@@ -575,7 +593,7 @@ RunScriptPlugin::getRegionsOfInterest(const OFX::RegionsOfInterestArguments &arg
         for (int i = 0; i < kRunScriptPluginSourceClipCount; ++i) {
             OfxRectD srcRoI;
 
-            if (_srcClip[i] && _srcClip[i]->isConnected()) {
+            if ( _srcClip[i] && _srcClip[i]->isConnected() ) {
                 srcRoI = _srcClip[i]->getRegionOfDefinition(args.time);
                 rois.setRegionOfInterest(*_srcClip[i], srcRoI);
             }
@@ -584,21 +602,20 @@ RunScriptPlugin::getRegionsOfInterest(const OFX::RegionsOfInterestArguments &arg
 }
 
 bool
-RunScriptPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args,
-                                       OfxRectD &/*rod*/)
+RunScriptPlugin::getRegionOfDefinition(const RegionOfDefinitionArguments &args,
+                                       OfxRectD & /*rod*/)
 {
-    if (!kSupportsRenderScale && (args.renderScale.x != 1. || args.renderScale.y != 1.)) {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+    if ( !kSupportsRenderScale && ( (args.renderScale.x != 1.) || (args.renderScale.y != 1.) ) ) {
+        throwSuiteStatusException(kOfxStatFailed);
     }
 
     // use the default RoD
     return false;
 }
 
-
 mDeclarePluginFactory(RunScriptPluginFactory, {}, {});
-
-void RunScriptPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
+void
+RunScriptPluginFactory::describe(ImageEffectDescriptor &desc)
 {
     DBG(std::cout << "describing!\n");
     // basic labels
@@ -629,22 +646,24 @@ void RunScriptPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setSupportsMultipleClipPARs(false);
 }
 
-void RunScriptPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context)
+void
+RunScriptPluginFactory::describeInContext(ImageEffectDescriptor &desc,
+                                          ContextEnum context)
 {
     DBG(std::cout << "describing in context " << (int)context << std::endl);
 
-    const ImageEffectHostDescription &gHostDescription = *OFX::getImageEffectHostDescription();
-    bool hostIsNuke = (gHostDescription.hostName.find("nuke") != std::string::npos ||
-                       gHostDescription.hostName.find("Nuke") != std::string::npos);
+    const ImageEffectHostDescription &gHostDescription = *getImageEffectHostDescription();
+    bool hostIsNuke = (gHostDescription.hostName.find("nuke") != string::npos ||
+                       gHostDescription.hostName.find("Nuke") != string::npos);
 
     // Source clip only in the filter context
     // create the mandated source clip
     for (int i = 0; i < kRunScriptPluginSourceClipCount; ++i) {
         ClipDescriptor *srcClip;
-        if (i == 0 && context == eContextFilter) {
+        if ( (i == 0) && (context == eContextFilter) ) {
             srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName); // mandatory clip for the filter context
         } else {
-            const std::string istr = unsignedToString(i+1);
+            const string istr = unsignedToString(i + 1);
             srcClip = desc.defineClip(istr);
         }
         srcClip->addSupportedComponent(ePixelComponentRGB);
@@ -694,7 +713,7 @@ void RunScriptPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         // Note: if we use setIsSecret() here, the parameters cannot be shown again in Nuke.
         // We thus hide them in updateVisibility(), which is called after instance creation
         for (int i = 0; i < kRunScriptPluginArgumentsCount; ++i) {
-            const std::string istr = unsignedToString(i+1);
+            const string istr = unsignedToString(i + 1);
             {
                 ChoiceParamDescriptor* param = desc.defineChoiceParam(kParamType + istr);
                 param->setLabel(kParamTypeLabel + istr);
@@ -749,7 +768,7 @@ void RunScriptPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
                 param->setAnimates(true);
                 //param->setIsSecretAndDisabled(true); // done in the plugin constructor
                 param->setRange(-DBL_MAX, DBL_MAX);
-                param->setDisplayRange(-1000.,1000.);
+                param->setDisplayRange(-1000., 1000.);
                 if (group) {
                     param->setParent(*group);
                 }
@@ -778,7 +797,7 @@ void RunScriptPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         StringParamDescriptor *param = desc.defineStringParam(kParamScript);
         param->setLabel(kParamScriptLabel);
         if (hostIsNuke) {
-            param->setHint(std::string(kParamScriptHint) + " " kNukeWarnTcl);
+            param->setHint(string(kParamScriptHint) + " " kNukeWarnTcl);
         } else {
             param->setHint(kParamScriptHint);
         }
@@ -799,13 +818,14 @@ void RunScriptPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
             page->addChild(*param);
         }
     }
-}
+} // RunScriptPluginFactory::describeInContext
 
-OFX::ImageEffect* RunScriptPluginFactory::createInstance(OfxImageEffectHandle handle, OFX::ContextEnum /*context*/)
+ImageEffect*
+RunScriptPluginFactory::createInstance(OfxImageEffectHandle handle,
+                                       ContextEnum /*context*/)
 {
     return new RunScriptPlugin(handle);
 }
-
 
 static RunScriptPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);
 mRegisterPluginFactoryInstance(p)

@@ -46,7 +46,7 @@
 #include "IOUtility.h"
 
 NAMESPACE_OFX_ENTER
-NAMESPACE_OFX_IO_ENTER
+    NAMESPACE_OFX_IO_ENTER
 
 
 #ifdef OFX_IO_USING_OCIO
@@ -76,10 +76,10 @@ NAMESPACE_OFX_IO_ENTER
 #define kOCIOParamContext "Context"
 #define kOCIOParamContextLabel "OCIO Context"
 #define kOCIOParamContextHint \
-"OCIO Contexts allow you to apply specific LUTs or grades to different shots.\n" \
-"Here you can specify the context name (key) and its corresponding value.\n" \
-"Full details of how to set up contexts and add them to your config can be found in the OpenColorIO documentation:\n" \
-"http://opencolorio.org/userguide/contexts.html"
+    "OCIO Contexts allow you to apply specific LUTs or grades to different shots.\n" \
+    "Here you can specify the context name (key) and its corresponding value.\n" \
+    "Full details of how to set up contexts and add them to your config can be found in the OpenColorIO documentation:\n" \
+    "http://opencolorio.org/userguide/contexts.html"
 
 #define kOCIOParamContextKey1 "key1"
 #define kOCIOParamContextValue1 "value1"
@@ -110,12 +110,13 @@ public:
 class GenericOCIO
 {
     friend class OCIOProcessor;
+
 public:
     GenericOCIO(OFX::ImageEffect* parent);
-    bool isIdentity(double time);
+    bool isIdentity(double time) const;
 
     /**
-     * @brief Applies the given OCIO processor using GLSL with the given source texture onto 
+     * @brief Applies the given OCIO processor using GLSL with the given source texture onto
      * the currently bound framebuffer.
      * @param lut3DParam[in,out] If non NULL, you may pass a storage for the LUT3D so that the allocation
      * of the LUT only occurs once.
@@ -135,7 +136,7 @@ public:
      * the function may determine if generating and compiling the shader again is required. If the shader cache ID did not change, the shader passed
      * by shaderProgramIDParam will be used as-is.
      *
-     * Note: All lut3DParam, lut3DTexIDParam, shaderProgramIDParam, lut3DCacheIDParam, shaderTextCacheIDParam must be either set to a value different 
+     * Note: All lut3DParam, lut3DTexIDParam, shaderProgramIDParam, lut3DCacheIDParam, shaderTextCacheIDParam must be either set to a value different
      * than NULL, or all set to NULL.
      *
      **/
@@ -154,21 +155,23 @@ public:
     void apply(double time, const OfxRectI& renderWindow, float *pixelData, const OfxRectI& bounds, OFX::PixelComponentEnum pixelComponents, int pixelComponentCount, int rowBytes);
     void changedParam(const OFX::InstanceChangedArgs &args, const std::string &paramName);
     void purgeCaches();
-    void getInputColorspace(std::string &v);
-    void getInputColorspaceAtTime(double time, std::string &v);
-    void getOutputColorspace(std::string &v);
-    void getOutputColorspaceAtTime(double time, std::string &v);
+    void getInputColorspaceDefault(std::string &v) const;
+    void getInputColorspace(std::string &v) const;
+    void getInputColorspaceAtTime(double time, std::string &v) const;
+    void getOutputColorspaceDefault(std::string &v) const;
+    void getOutputColorspace(std::string &v) const;
+    void getOutputColorspaceAtTime(double time, std::string &v) const;
     bool hasColorspace(const char* name) const;
     void setInputColorspace(const char* name);
     void setOutputColorspace(const char* name);
 #ifdef OFX_IO_USING_OCIO
-    OCIO_NAMESPACE::ConstContextRcPtr getLocalContext(double time);
-    OCIO_NAMESPACE::ConstConfigRcPtr getConfig() { return _config; };
-    OCIO_NAMESPACE::ConstProcessorRcPtr getProcessor();
+    OCIO_NAMESPACE::ConstContextRcPtr getLocalContext(double time) const;
+    OCIO_NAMESPACE::ConstConfigRcPtr getConfig() const { return _config; };
+    OCIO_NAMESPACE::ConstProcessorRcPtr getProcessor() const;
     OCIO_NAMESPACE::ConstProcessorRcPtr getOrCreateProcessor(double time);
 
 #endif
-    bool configIsDefault();
+    bool configIsDefault() const;
 
     // Each of the following functions re-reads the OCIO config: Not optimal but more clear.
     static void describeInContextInput(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context, OFX::PageParamDescriptor *page, const char* inputSpaceNameDefault, const char* inputSpaceLabel = kOCIOParamInputSpaceLabel);
@@ -179,7 +182,7 @@ public:
     void setValues(const std::string& inputSpace, const std::string& outputSpace);
     void setValues(const OCIO_NAMESPACE::ConstContextRcPtr &context, const std::string& inputSpace, const std::string& outputSpace);
 #endif
-    
+
     // Calls inputCheck and outputCheck
     void refreshInputAndOutputState(double time)
     {
@@ -225,7 +228,7 @@ private:
 
     OCIO_NAMESPACE::ConstConfigRcPtr _config;
 
-    Mutex _procMutex;
+    mutable Mutex _procMutex;
     OCIO_NAMESPACE::ConstProcessorRcPtr _proc;
     OCIO_NAMESPACE::ConstContextRcPtr _procContext;
     std::string _procInputSpace;
@@ -235,19 +238,22 @@ private:
 };
 
 #ifdef OFX_IO_USING_OCIO
-class OCIOProcessor : public OFX::PixelProcessor {
+class OCIOProcessor
+    : public OFX::PixelProcessor
+{
 public:
     // ctor
     OCIOProcessor(OFX::ImageEffect &instance)
-    : OFX::PixelProcessor(instance)
-    , _proc()
-    , _instance(&instance)
+        : OFX::PixelProcessor(instance)
+        , _proc()
+        , _instance(&instance)
     {}
 
     // and do some processing
     void multiThreadProcessImages(OfxRectI procWindow);
 
-    void setProcessor(const OCIO_NAMESPACE::ConstProcessorRcPtr& proc) {
+    void setProcessor(const OCIO_NAMESPACE::ConstProcessorRcPtr& proc)
+    {
         _proc = proc;
     }
 
@@ -255,9 +261,10 @@ private:
     OCIO_NAMESPACE::ConstProcessorRcPtr _proc;
     OFX::ImageEffect* _instance;
 };
+
 #endif
 
 NAMESPACE_OFX_IO_EXIT
-NAMESPACE_OFX_EXIT
+    NAMESPACE_OFX_EXIT
 
-#endif
+#endif // ifndef IO_GenericOCIO_h
