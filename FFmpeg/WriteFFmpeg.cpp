@@ -1,6 +1,6 @@
 /* ***** BEGIN LICENSE BLOCK *****
  * This file is part of openfx-io <https://github.com/MrKepzie/openfx-io>,
- * Copyright (C) 2015 INRIA
+ * Copyright (C) 2013-2017 INRIA
  *
  * openfx-io is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -157,7 +157,7 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #define kParamFPS "fps"
 #define kParamFPSLabel "FPS"
-#define kParamFPSHint "File frame rate"
+#define kParamFPSHint "File frame rate"
 
 #define kParamResetFPS "resetFps"
 #define kParamResetFPSLabel "Reset FPS"
@@ -189,7 +189,7 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 #define kParamBitrateLabel "Bitrate"
 #define kParamBitrateHint \
     "The target bitrate the codec will attempt to reach (in Megabits/s), within the confines of the bitrate tolerance and " \
-    "quality min/max settings. Only supported by certain codecs (e.g. hev1, m2v1, MP42, 3IVD, but not mp4v, avc1 or H264).\n" \
+    "quality min/max settings. Only supported by certain codecs (e.g. hev1, m2v1, MP42, 3IVD, but not mp4v, avc1 or H264).\n" \
     "Option -b in ffmpeg (multiplied by 1000000)."
 #define kParamBitrateDefault 185
 #define kParamBitrateMax 4000
@@ -445,7 +445,7 @@ CreateCodecKnobLabelsMap()
     m["libx265"]       = "hev1\tH.265 / HEVC (High Efficiency Video Coding)"; // disabled in whitelist (does not work will all sizes)
 
     m["ljpeg"]         = "LJPG\tLossless JPEG"; // disabled in whitelist
-    m["mjpeg"]         = "jpeg\tMotion JPEG";
+    m["mjpeg"]         = "jpeg\tPhoto JPEG";
     m["mpeg1video"]    = "m1v \tMPEG-1 Video"; // disabled in whitelist (random blocks)
     m["mpeg2video"]    = "m2v1\tMPEG-2 Video";
     m["mpeg4"]         = "mp4v\tMPEG-4 Video";
@@ -3299,6 +3299,10 @@ WriteFFmpegPlugin::beginEncode(const string& filename,
             av_opt_set(avCodecContext->priv_data, "vendor", "ap10", 0);
         }
 #endif
+        if (codecId == AV_CODEC_ID_MJPEG) {
+            // vendor should be ap10 (Apple) according to https://trac.ffmpeg.org/wiki/Encode/VFX#PhotoJPEG
+            av_opt_set(avCodecContext->priv_data, "vendor", "ap10", 0);
+        }
 
         // Activate multithreaded decoding. This must be done before opening the codec; see
         // http://lists.gnu.org/archive/html/bino-list/2011-08/msg00019.html
