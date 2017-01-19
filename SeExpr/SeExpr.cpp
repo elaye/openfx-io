@@ -181,7 +181,7 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
     "*SeExprSimple:*\n" \
     "\n" \
     "    r*r2\n" \
-    "    g*g2" \
+    "    g*g2\n" \
     "    b*b2\n" \
     "    a+a2-a*a2\n" \
     "\n" \
@@ -244,7 +244,7 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
     "        src = [0,0,0];\n" \
     "    }\n" \
     "\n" \
-    "If one of these conditions does not hold, all frames from the specified input frame range are asked for.\n"
+    "If one of these conditions does not hold, all frames from the specified input frame range are asked for."
 #define kPluginDescription kPluginDescriptionHead kPluginDescriptionMid kPluginDescriptionFoot
 #define kPluginDescriptionSimple kPluginDescriptionHead kPluginDescriptionMidSimple kPluginDescriptionFoot
 
@@ -3453,12 +3453,16 @@ SeExprPluginFactory<simple>::describeInContext(ImageEffectDescriptor &desc,
         param->appendOption(kParamFormatNTSCLabel);
         assert(param->getNOptions() == eParamFormatPAL);
         param->appendOption(kParamFormatPALLabel);
-        assert(param->getNOptions() == eParamFormatHD);
-        param->appendOption(kParamFormatHDLabel);
         assert(param->getNOptions() == eParamFormatNTSC169);
         param->appendOption(kParamFormatNTSC169Label);
         assert(param->getNOptions() == eParamFormatPAL169);
         param->appendOption(kParamFormatPAL169Label);
+        assert(param->getNOptions() == eParamFormatHD720);
+        param->appendOption(kParamFormatHD720Label);
+        assert(param->getNOptions() == eParamFormatHD);
+        param->appendOption(kParamFormatHDLabel);
+        assert(param->getNOptions() == eParamFormatUHD4K);
+        param->appendOption(kParamFormatUHD4KLabel);
         assert(param->getNOptions() == eParamFormat1kSuper35);
         param->appendOption(kParamFormat1kSuper35Label);
         assert(param->getNOptions() == eParamFormat1kCinemascope);
@@ -3467,10 +3471,14 @@ SeExprPluginFactory<simple>::describeInContext(ImageEffectDescriptor &desc,
         param->appendOption(kParamFormat2kSuper35Label);
         assert(param->getNOptions() == eParamFormat2kCinemascope);
         param->appendOption(kParamFormat2kCinemascopeLabel);
+        assert(param->getNOptions() == eParamFormat2kDCP);
+        param->appendOption(kParamFormat2kDCPLabel);
         assert(param->getNOptions() == eParamFormat4kSuper35);
         param->appendOption(kParamFormat4kSuper35Label);
         assert(param->getNOptions() == eParamFormat4kCinemascope);
         param->appendOption(kParamFormat4kCinemascopeLabel);
+        assert(param->getNOptions() == eParamFormat4kDCP);
+        param->appendOption(kParamFormat4kDCPLabel);
         assert(param->getNOptions() == eParamFormatSquare256);
         param->appendOption(kParamFormatSquare256Label);
         assert(param->getNOptions() == eParamFormatSquare512);

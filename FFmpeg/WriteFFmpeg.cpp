@@ -22,6 +22,9 @@
  */
 
 
+// to test writing a codec with ffmpeg (e.g. DNxHD with dnxhr_lb profile):
+// ffmpeg -f lavfi  -i testsrc=size=2048x1152 -vframes 2 -vcodec dnxhd -profile:v dnxhr_lb out.mov
+
 #if (defined(_STDINT_H) || defined(_STDINT_H_) || defined(_MSC_STDINT_H_ ) ) && !defined(UINT64_C)
 #warning "__STDC_CONSTANT_MACROS has to be defined before including <stdint.h>, this file will probably not compile."
 #endif
@@ -32,6 +35,7 @@
 #include <cstdio>
 #include <cstring> // strncpy
 #include <cfloat> // DBL_MAX
+#include <climits> // INT_MAX
 #include <sstream>
 #include <algorithm>
 #include <string>
@@ -202,9 +206,10 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
     "the target average bitrate value. This is not related to min/max " \
     "bitrate. Lowering tolerance too much has an adverse effect on " \
     "quality. " \
-    "As a guideline, the minimum slider range of target bitrate/target fps is the lowest advisable setting. Anything below this value may result in failed renders." \
+    "As a guideline, the minimum slider range of target bitrate/target fps is the lowest advisable setting. Anything below this value may result in failed renders.\n" \
     "Only supported by certain codecs (e.g. MP42, 3IVD, but not avc1, hev1, m2v1, mp4v or H264).\n" \
-    "Option -bt in ffmpeg (multiplied by 1000000)."
+    "A reasonable value is 5 * bitrateMbps / fps. This corresponds to option -bt in ffmpeg (multiplied by 1000000)."
+#define kParamBitrateToleranceMax (INT_MAX/1000000) // tol*1000000 is stored in an int
 
 #define kParamQuality "quality"
 #define kParamQualityLabel "Quality"
@@ -261,7 +266,15 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 #define kProresProfile4444XQFourCC "ap4x"
 
 #if OFX_FFMPEG_DNXHD
-// Valid DNxHD profiles (as of FFmpeg 2.8.6):
+
+// dnxhr_444 and dnxhr_hqx is still not supported as of ffmpeg 3.2.2
+// try with:
+// ffmpeg -f lavfi  -i testsrc=size=2048x1152 -vframes 2 -vcodec dnxhd -profile:v dnxhr_444 out.mov
+// ffmpeg -f lavfi  -i testsrc=size=2048x1152 -vframes 2 -vcodec dnxhd -profile:v dnxhr_hqx out.mov
+// [dnxhd @ 0x7fb72f802e00] dnxhr_444 or dnxhr_hqx profile is not implemented. Update your FFmpeg version to the newest one from Git. If the problem still occurs, it means that your file has a feature which has not been implemented.
+#define OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444 0
+
+// Valid DNxHD profiles (as of FFmpeg 3.2.2):
 // Frame size: 1920x1080p; bitrate: 175Mbps; pixel format: yuv422p10; framerate: 24000/1001
 // Frame size: 1920x1080p; bitrate: 185Mbps; pixel format: yuv422p10; framerate: 25/1
 // Frame size: 1920x1080p; bitrate: 365Mbps; pixel format: yuv422p10; framerate: 50/1
@@ -282,6 +295,8 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 // Frame size: 1920x1080i; bitrate: 145Mbps; pixel format: yuv422p; framerate: 30000/1001
 // Frame size: 1920x1080i; bitrate: 185Mbps; pixel format: yuv422p; framerate: 25/1
 // Frame size: 1920x1080i; bitrate: 220Mbps; pixel format: yuv422p; framerate: 30000/1001
+// Frame size: 1440x1080i; bitrate: 120Mbps; pixel format: yuv422p; framerate: 25/1
+// Frame size: 1440x1080i; bitrate: 145Mbps; pixel format: yuv422p; framerate: 30000/1001
 // Frame size: 1280x720p; bitrate: 90Mbps; pixel format: yuv422p10; framerate: 24000/1001
 // Frame size: 1280x720p; bitrate: 90Mbps; pixel format: yuv422p10; framerate: 25/1
 // Frame size: 1280x720p; bitrate: 180Mbps; pixel format: yuv422p10; framerate: 50/1
@@ -333,6 +348,18 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 #define kParamDNxHDCodecProfile "DNxHDCodecProfile"
 #define kParamDNxHDCodecProfileLabel "DNxHD Codec Profile"
 #define kParamDNxHDCodecProfileHint "Only for the Avid DNxHD codec, select the target bit rate for the encoded movie. The stream may be resized to 1920x1080 if resolution is not supported. Writing in thin-raster HDV format (1440x1080) is not supported by this plug-in, although FFmpeg supports it."
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+#define kParamDNxHDCodecProfileOptionHR444   "DNxHR 444"
+#define kParamDNxHDCodecProfileOptionHR444Hint   "DNxHR 4:4:4 (12 bit, RGB / 4:4:4, 4.5:1 compression)"
+#define kParamDNxHDCodecProfileOptionHRHQX   "DNxHR HQX"
+#define kParamDNxHDCodecProfileOptionHRHQXHint   "DNxHR High Quality (12 bit, 4:2:2 chroma sub-sampling, 5.5:1 compression)"
+#endif
+#define kParamDNxHDCodecProfileOptionHRHQ   "DNxHR HQ"
+#define kParamDNxHDCodecProfileOptionHRHQHint   "DNxHR High Quality (8 bit, 4:2:2 chroma sub-sampling, 4.5:1 compression)"
+#define kParamDNxHDCodecProfileOptionHRSQ   "DNxHR SQ"
+#define kParamDNxHDCodecProfileOptionHRSQHint   "DNxHR Standard Quality (8 bit, 4:2:2 chroma sub-sampling, 7:1 compression)"
+#define kParamDNxHDCodecProfileOptionHRLB   "DNxHR LB"
+#define kParamDNxHDCodecProfileOptionHRLBHint   "DNxHR Low Bandwidth (8 bit, 4:2:2 chroma sub-sampling, 22:1 compression)"
 #define kParamDNxHDCodecProfileOption440x AVID_DNXHD_422_440X_NAME
 #define kParamDNxHDCodecProfileOption440xHint "880x in 1080p/60 or 1080p/59.94, 730x in 1080p/50, 440x in 1080p/30, 390x in 1080p/25, 350x in 1080p/24"
 #define kParamDNxHDCodecProfileOption220x AVID_DNXHD_422_220X_NAME
@@ -346,6 +373,14 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 enum DNxHDCodecProfileEnum
 {
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+    // in ffmpeg 3.2.2: dnxhr_444 or dnxhr_hqx profile is not implemented. Update your FFmpeg version to the newest one from Git. If the problem still occurs, it means that your file has a feature which has not been implemented.
+    eDNxHDCodecProfileHR444,
+    eDNxHDCodecProfileHRHQX,
+#endif
+    eDNxHDCodecProfileHRHQ,
+    eDNxHDCodecProfileHRSQ,
+    eDNxHDCodecProfileHRLB,
     eDNxHDCodecProfile440x,
     eDNxHDCodecProfile220x,
     eDNxHDCodecProfile220,
@@ -366,6 +401,11 @@ enum DNxHDCodecProfileEnum
 
 #define STR_HELPER(x) # x
 #define STR(x) STR_HELPER(x)
+
+template<typename T>
+static inline void
+unused(const T&) {}
+
 
 // The fourccs for MJPEGA, MJPEGB, and Photo JPEG
 static const char*  kJpegCodecs[] = { "jpeg", "mjpa", "mjpb" };
@@ -1449,13 +1489,22 @@ WriteFFmpegPlugin::IsYUV(AVPixelFormat pix_fmt)
 /*static*/
 bool
 WriteFFmpegPlugin::IsYUVFromShortName(const char* shortName,
-                                      int /*codecProfile*/)
+                                      int codecProfile)
 {
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+#else
+    unused(codecProfile);
+#endif
+    
     return ( !strcmp(shortName, kProresCodec kProresProfileHQFourCC) ||
              !strcmp(shortName, kProresCodec kProresProfileSQFourCC) ||
              !strcmp(shortName, kProresCodec kProresProfileLTFourCC) ||
              !strcmp(shortName, kProresCodec kProresProfileProxyFourCC) ||
-             ( /*(codecProfile != (int)eDNxHDCodecProfile440x) &&*/ !strcmp(shortName, "dnxhd") ) ||
+             (
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+              (codecProfile != (int)eDNxHDCodecProfileHR444) &&
+#endif
+              !strcmp(shortName, "dnxhd")) ||
              !strcmp(shortName, "mjpeg") ||
              !strcmp(shortName, "mpeg1video") ||
              !strcmp(shortName, "mpeg4") ||
@@ -1468,11 +1517,18 @@ bool
 WriteFFmpegPlugin::IsRGBFromShortName(const char* shortName,
                                       int codecProfile)
 {
-    (void)codecProfile;
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+#else
+    unused(codecProfile);
+#endif
 
     return ( !strcmp(shortName, kProresCodec kProresProfile4444FourCC) ||
              !strcmp(shortName, kProresCodec kProresProfile4444XQFourCC) ||
-             //((codecProfile == (int)eDNxHDCodecProfile440x) && !strcmp(shortName, "dnxhd")) ||
+             (
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+              (codecProfile == (int)eDNxHDCodecProfileHR444) &&
+#endif
+              !strcmp(shortName, "dnxhd")) ||
              !strcmp(shortName, "png")  ||
              !strcmp(shortName, "qtrle") );
 }
@@ -1678,11 +1734,24 @@ WriteFFmpegPlugin::getPixelFormats(AVCodec* videoCodec,
 #if OFX_FFMPEG_DNXHD
     if (AV_CODEC_ID_DNXHD == videoCodec->id) {
         DNxHDCodecProfileEnum dnxhdCodecProfile = (DNxHDCodecProfileEnum)_dnxhdCodecProfile->getValue();
-        if ( (dnxhdCodecProfile == eDNxHDCodecProfile220x) || (dnxhdCodecProfile == eDNxHDCodecProfile440x) ) {
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+        if (dnxhdCodecProfile == eDNxHDCodecProfileHR444) {
+            outTargetPixelFormat = AV_PIX_FMT_RGB48;
+            outBitDepth = 12;
+        } else if (dnxhdCodecProfile == eDNxHDCodecProfileHRHQX) {
+            outTargetPixelFormat = AV_PIX_FMT_YUV422P12;
+            outBitDepth = 12;
+        } else
+#endif
+        if ( (dnxhdCodecProfile == eDNxHDCodecProfileHRHQ) || (dnxhdCodecProfile == eDNxHDCodecProfileHRSQ) || (dnxhdCodecProfile == eDNxHDCodecProfileHRLB) ) {
+            outTargetPixelFormat = AV_PIX_FMT_YUV422P;
+            outBitDepth = 8;
+        } else if ( (dnxhdCodecProfile == eDNxHDCodecProfile220x) || (dnxhdCodecProfile == eDNxHDCodecProfile440x) ) {
             outTargetPixelFormat = AV_PIX_FMT_YUV422P10;
             outBitDepth = 10;
         } else {
             outTargetPixelFormat = AV_PIX_FMT_YUV422P;
+            outBitDepth = 8;
         }
     } else
 #endif // FN_LICENSED_PRORES_CODEC
@@ -1823,7 +1892,8 @@ WriteFFmpegPlugin::GetPixelFormatBitDepth(const AVPixelFormat pixelFormat)
         return 16;
         break;
 
-    case AV_PIX_FMT_YUV411P:         // Uncompressed 4:1:1 12bit
+    case AV_PIX_FMT_YUV422P12LE:     // planar YUV 4:2:2,24bpp, (1 Cr & Cb sample per 2x1 Y samples), little-endian
+    case AV_PIX_FMT_YUV422P12BE:     // planar YUV 4:2:2,24bpp, (1 Cr & Cb sample per 2x1 Y samples), big-endian
         return 12;
         break;
 
@@ -1831,12 +1901,13 @@ WriteFFmpegPlugin::GetPixelFormatBitDepth(const AVPixelFormat pixelFormat)
     case AV_PIX_FMT_YUV422P10BE:     // Uncompressed 4:2:2 10bit - planar
     case AV_PIX_FMT_YUV444P10LE:     // Uncompressed 4:4:4 10bit - planar
     case AV_PIX_FMT_YUV444P10BE:     // Uncompressed 4:4:4 10bit - planar
-    case AV_PIX_FMT_YUVA444P10LE:     // Uncompressed 4:4:4:4 10bit - planar
-    case AV_PIX_FMT_YUVA444P10BE:     // Uncompressed 4:4:4:4 10bit - planar
+    case AV_PIX_FMT_YUVA444P10LE:    // Uncompressed 4:4:4:4 10bit - planar
+    case AV_PIX_FMT_YUVA444P10BE:    // Uncompressed 4:4:4:4 10bit - planar
     case AV_PIX_FMT_YUVA444P:        // Uncompressed packed QT 4:4:4:4
         return 10;
         break;
 
+    case AV_PIX_FMT_YUV411P:         // Uncompressed 4:1:1 12bit
     case AV_PIX_FMT_YUV420P:     // MPEG-1, MPEG-2, MPEG-4 part2 (default)
     case AV_PIX_FMT_YUVJ420P:     // MJPEG
     case AV_PIX_FMT_YUV422P:     // DNxHD
@@ -2050,6 +2121,9 @@ WriteFFmpegPlugin::configureVideoStream(AVCodec* avCodec,
     if (!avCodec || !avStream || !_formatContext) {
         return;
     }
+#if (LIBAVFORMAT_VERSION_MAJOR > 57) && !defined(FF_API_LAVF_AVCTX)
+#error "Using AVStream.codec to pass codec parameters to muxers is deprecated, use AVStream.codecpar instead."
+#endif
     AVCodecContext* avCodecContext = avStream->codec;
     assert(avCodecContext);
     if (!avCodecContext) {
@@ -2073,10 +2147,13 @@ WriteFFmpegPlugin::configureVideoStream(AVCodec* avCodec,
     if (bitrateParam) {
         double bitrate = _bitrate->getValue();
         avCodecContext->bit_rate = (int)(bitrate * 1000000);
-    }
-    if (bitrateTolParam) {
-        double bitrateTolerance = _bitrateTolerance->getValue();
-        avCodecContext->bit_rate_tolerance = (int)(bitrateTolerance * 1000000);
+        if (bitrateTolParam) {
+            double fps = _fps->getValue();
+            double bitrateToleranceMin = std::ceil( (bitrate / std::min(fps, 4.)) * 1000000) / 1000000.;
+            double bitrateTolerance = std::max( bitrateToleranceMin, _bitrateTolerance->getValue() );
+
+            avCodecContext->bit_rate_tolerance = (int)(bitrateTolerance * 1000000);
+        }
     }
     if (qualityParams) {
         int qMin, qMax;
@@ -2219,6 +2296,9 @@ WriteFFmpegPlugin::configureVideoStream(AVCodec* avCodec,
         // integers are represented exactly as float, so most of the time the denominator will be 1
         frame_rate = av_d2q(fps, INT_MAX);
     }
+#if (LIBAVFORMAT_VERSION_MAJOR > 57) && !defined(FF_API_LAVF_CODEC_TB)
+#error "Using AVStream.codec.time_base as a timebase hint to the muxer is deprecated. Set AVStream.time_base instead."
+#endif
     avCodecContext->time_base = av_inv_q(frame_rate);;
     // [mov @ 0x1042d7600] Using AVStream.codec.time_base as a timebase hint to the muxer is deprecated. Set AVStream.time_base instead.
     // copy timebase while removing common factors
@@ -2236,6 +2316,7 @@ WriteFFmpegPlugin::configureVideoStream(AVCodec* avCodec,
 #if FF_API_PRIVATE_OPT
         avCodecContext->b_frame_strategy = 0;
 #endif
+        av_opt_set_int(avCodecContext->priv_data, "b-strategy", 0, 0);
         avCodecContext->b_quant_factor = 2.0f;
     }
 
@@ -2279,6 +2360,28 @@ WriteFFmpegPlugin::configureVideoStream(AVCodec* avCodec,
         int mbs = 0;
         DNxHDCodecProfileEnum dnxhdCodecProfile = (DNxHDCodecProfileEnum)dnxhdCodecProfile_i;
         switch (dnxhdCodecProfile) {
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+        case eDNxHDCodecProfileHR444:
+            av_opt_set(avCodecContext->priv_data, "profile", "dnxhr_444", 0);
+            mbs = -1;
+            break;
+        case eDNxHDCodecProfileHRHQX:
+            av_opt_set(avCodecContext->priv_data, "profile", "dnxhr_hqx", 0);
+            mbs = -1;
+            break;
+#endif
+        case eDNxHDCodecProfileHRHQ:
+            av_opt_set(avCodecContext->priv_data, "profile", "dnxhr_hq", 0);
+            mbs = -1;
+            break;
+        case eDNxHDCodecProfileHRSQ:
+            av_opt_set(avCodecContext->priv_data, "profile", "dnxhr_sq", 0);
+            mbs = -1;
+            break;
+        case eDNxHDCodecProfileHRLB:
+            av_opt_set(avCodecContext->priv_data, "profile", "dnxhr_lb", 0);
+            mbs = -1;
+            break;
         case eDNxHDCodecProfile440x:
             // 880x in 1080p/60 or 1080p/59.94, 730x in 1080p/50, 440x in 1080p/30, 390x in 1080p/25, 350x in 1080p/24
             if ( ( avCodecContext->width == 1920) && ( avCodecContext->height == 1080) ) {
@@ -2407,7 +2510,9 @@ WriteFFmpegPlugin::configureVideoStream(AVCodec* avCodec,
             setPersistentMessage(Message::eMessageError, "", "frameRate not supported for DNxHD");
             throwSuiteStatusException(kOfxStatFailed);
         }
-        avCodecContext->bit_rate = mbs * 1000000;
+        if (mbs > 0) {
+            avCodecContext->bit_rate = mbs * 1000000;
+        }
     }
 #endif // DNxHD
 
@@ -3655,11 +3760,11 @@ WriteFFmpegPlugin::updateBitrateToleranceRange()
     //We're not force limiting the range since the upper range is not bounded.
     double bitrate = _bitrate->getValue();
     double fps = _fps->getValue();
-    // guard agains division by zero
-    double minRange = (fps > 0.) ? bitrate / fps : bitrate;
+    // guard agains division by zero - the 4 comes from the ffserver.c code
+    double minRange = std::ceil( (bitrate / std::min(fps, 4.)) * 1000000) / 1000000.;
 
-    _bitrateTolerance->setRange(minRange, DBL_MAX);
-    _bitrateTolerance->setDisplayRange(minRange, kParamBitrateMax);
+    _bitrateTolerance->setRange(minRange, kParamBitrateToleranceMax);
+    _bitrateTolerance->setDisplayRange(minRange, kParamBitrateToleranceMax);
 }
 
 // Check that the secret codecShortName corresponds to the selected codec.
@@ -4383,6 +4488,20 @@ WriteFFmpegPluginFactory::describeInContext(ImageEffectDescriptor &desc,
         ChoiceParamDescriptor* param = desc.defineChoiceParam(kParamDNxHDCodecProfile);
         param->setLabel(kParamDNxHDCodecProfileLabel);
         param->setHint(kParamDNxHDCodecProfileHint);
+        // DNxHR
+#if OFX_FFMPEG_DNXHD_SUPPORTS_DNXHR_444
+        assert(param->getNOptions() == (int)eDNxHDCodecProfileHR444);
+        param->appendOption(kParamDNxHDCodecProfileOptionHR444, kParamDNxHDCodecProfileOptionHR444Hint);
+        assert(param->getNOptions() == (int)eDNxHDCodecProfileHRHQX);
+        param->appendOption(kParamDNxHDCodecProfileOptionHRHQX, kParamDNxHDCodecProfileOptionHRHQXHint);
+#endif
+        assert(param->getNOptions() == (int)eDNxHDCodecProfileHRHQ);
+        param->appendOption(kParamDNxHDCodecProfileOptionHRHQ, kParamDNxHDCodecProfileOptionHRHQHint);
+        assert(param->getNOptions() == (int)eDNxHDCodecProfileHRSQ);
+        param->appendOption(kParamDNxHDCodecProfileOptionHRSQ, kParamDNxHDCodecProfileOptionHRSQHint);
+        assert(param->getNOptions() == (int)eDNxHDCodecProfileHRLB);
+        param->appendOption(kParamDNxHDCodecProfileOptionHRLB, kParamDNxHDCodecProfileOptionHRLBHint);
+        // DNxHD
         assert(param->getNOptions() == (int)eDNxHDCodecProfile440x);
         param->appendOption(kParamDNxHDCodecProfileOption440x, kParamDNxHDCodecProfileOption440xHint);
         assert(param->getNOptions() == (int)eDNxHDCodecProfile220x);
@@ -4474,8 +4593,8 @@ WriteFFmpegPluginFactory::describeInContext(ImageEffectDescriptor &desc,
             DoubleParamDescriptor* param = desc.defineDoubleParam(kParamBitrateTolerance);
             param->setLabel(kParamBitrateToleranceLabel);
             param->setHint(kParamBitrateToleranceHint);
-            param->setRange(0, kParamBitrateMax);
-            param->setDefault(kParamBitrateMax);
+            param->setRange(0, kParamBitrateToleranceMax);
+            param->setDefault(0);
             param->setAnimates(false);
             param->setParent(*group);
             if (page) {
