@@ -12,5 +12,12 @@ fr.inria.openfx.ReadFFmpeg.svg \
 fr.inria.openfx.WriteFFmpeg.png \
 fr.inria.openfx.WriteFFmpeg.svg 
 
-CXXFLAGS += $(FFMPEG_CXXFLAGS) $(OCIO_CXXFLAGS)
-LINKFLAGS += $(FFMPEG_LINKFLAGS) $(OCIO_LINKFLAGS)
+CXXFLAGS += $(FFMPEG_CXXFLAGS)
+LINKFLAGS += $(FFMPEG_LINKFLAGS)
+
+USE_OCIO ?= true
+
+ifeq ($(USE_OCIO), true)
+	CXXFLAGS += $(OCIO_CXXFLAGS)
+	LINKFLAGS += $(OCIO_LINKFLAGS)
+endif
