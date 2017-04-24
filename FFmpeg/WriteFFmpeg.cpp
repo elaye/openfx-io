@@ -1230,7 +1230,9 @@ private:
     virtual void encode(const string& filename,
                         const OfxTime time,
                         const string& viewName,
-                        const float *pixelData,
+                        // CHANGED
+                        // const float *pixelData,
+                        const unsigned char *pixelData,
                         const OfxRectI& bounds,
                         const float pixelAspectRatio,
                         const int pixelDataNComps,
@@ -1269,8 +1271,12 @@ private:
     AVStream* addStream(AVFormatContext* avFormatContext, enum AVCodecID avCodecId, AVCodec** pavCodec);
     int openCodec(AVFormatContext* avFormatContext, AVCodec* avCodec, AVStream* avStream);
     int writeAudio(AVFormatContext* avFormatContext, AVStream* avStream, bool flush);
-    int writeVideo(AVFormatContext* avFormatContext, AVStream* avStream, bool flush, double time, const float *pixelData = NULL, const OfxRectI* bounds = NULL, int pixelDataNComps = 0, int dstNComps = 0, int rowBytes = 0);
-    int writeToFile(AVFormatContext* avFormatContext, bool finalise, double time, const float *pixelData = NULL, const OfxRectI* bounds = NULL, int pixelDataNComps = 0, int dstNComps = 0, int rowBytes = 0);
+  // CHANGED
+    // int writeVideo(AVFormatContext* avFormatContext, AVStream* avStream, bool flush, double time, const float *pixelData = NULL, const OfxRectI* bounds = NULL, int pixelDataNComps = 0, int dstNComps = 0, int rowBytes = 0);
+  int writeVideo(AVFormatContext* avFormatContext, AVStream* avStream, bool flush, double time, const unsigned char *pixelData = NULL, const OfxRectI* bounds = NULL, int pixelDataNComps = 0, int dstNComps = 0, int rowBytes = 0);
+  // CHANGED
+    // int writeToFile(AVFormatContext* avFormatContext, bool finalise, double time, const float *pixelData = NULL, const OfxRectI* bounds = NULL, int pixelDataNComps = 0, int dstNComps = 0, int rowBytes = 0);
+  int writeToFile(AVFormatContext* avFormatContext, bool finalise, double time, const unsigned char *pixelData = NULL, const OfxRectI* bounds = NULL, int pixelDataNComps = 0, int dstNComps = 0, int rowBytes = 0);
 
     int colourSpaceConvert(MyAVPicture* avPicture, AVFrame* avFrame, AVPixelFormat srcPixelFormat, AVPixelFormat dstPixelFormat, AVCodecContext* avCodecContext);
 
@@ -3478,7 +3484,9 @@ WriteFFmpegPlugin::writeVideo(AVFormatContext* avFormatContext,
                               AVStream* avStream,
                               bool flush,
                               double time,
-                              const float *pixelData,
+                              // CHANGED
+                              // const float *pixelData,
+                              const unsigned char *pixelData,
                               const OfxRectI* bounds,
                               int pixelDataNComps,
                               int dstNComps,
@@ -3533,40 +3541,57 @@ WriteFFmpegPlugin::writeVideo(AVFormatContext* avFormatContext,
 
             for (int y = 0; y < height; ++y) {
                 int srcY = height - 1 - y;
-                const float* src_pixels = (float*)( (char*)pixelData + srcY * rowBytes );
+                // CHANGED
+                // const float* src_pixels = (float*)( (char*)pixelData + srcY * rowBytes );
+                // const unsigned int* src_pixels = (char*)pixelData + srcY * rowBytes;
+                // const unsigned int* src_pixels = pixelData + srcY * rowBytes;
+                const unsigned char* src_pixels = pixelData + srcY * rowBytes;
+                // std::cout << "rowBytes " << rowBytes << std::endl;
 
-                if (avCodecContext->bits_per_raw_sample > 8) {
-                    assert(pixelFormatNuke == AV_PIX_FMT_RGBA64 || pixelFormatNuke == AV_PIX_FMT_RGB48LE);
+                // CHANGED -- start
+                // if (avCodecContext->bits_per_raw_sample > 8) {
+                //     assert(pixelFormatNuke == AV_PIX_FMT_RGBA64 || pixelFormatNuke == AV_PIX_FMT_RGB48LE);
 
-                    // avPicture.linesize is in bytes, but stride is U16 (2 bytes), so divide linesize by 2
-                    unsigned short* dst_pixels = reinterpret_cast<unsigned short*>(avPicture.data[0]) + y * (avPicture.linesize[0] / 2);
+                //     // avPicture.linesize is in bytes, but stride is U16 (2 bytes), so divide linesize by 2
+                //     unsigned short* dst_pixels = reinterpret_cast<unsigned short*>(avPicture.data[0]) + y * (avPicture.linesize[0] / 2);
 
-                    for (int x = 0; x < width; ++x) {
-                        int srcCol = x * pixelDataNComps;
-                        int dstCol = x * numDestChannels;
-                        dst_pixels[dstCol + 0] = floatToInt<65536>(src_pixels[srcCol + 0]);
-                        dst_pixels[dstCol + 1] = floatToInt<65536>(src_pixels[srcCol + 1]);
-                        dst_pixels[dstCol + 2] = floatToInt<65536>(src_pixels[srcCol + 2]);
-                        if (hasAlpha) {
-                            dst_pixels[dstCol + 3] = floatToInt<65536>( (pixelDataNComps == 4) ? src_pixels[srcCol + 3] : 1. );
-                        }
-                    }
-                } else {
+                //     for (int x = 0; x < width; ++x) {
+                //         int srcCol = x * pixelDataNComps;
+                //         int dstCol = x * numDestChannels;
+                //         dst_pixels[dstCol + 0] = floatToInt<65536>(src_pixels[srcCol + 0]);
+                //         dst_pixels[dstCol + 1] = floatToInt<65536>(src_pixels[srcCol + 1]);
+                //         dst_pixels[dstCol + 2] = floatToInt<65536>(src_pixels[srcCol + 2]);
+                //         if (hasAlpha) {
+                //             dst_pixels[dstCol + 3] = floatToInt<65536>( (pixelDataNComps == 4) ? src_pixels[srcCol + 3] : 1. );
+                //         }
+                //     }
+                // } else {
                     assert(pixelFormatNuke == AV_PIX_FMT_RGBA || pixelFormatNuke == AV_PIX_FMT_RGB24);
 
                     unsigned char* dst_pixels = avPicture.data[0] + y * avPicture.linesize[0];
+                    // std::cout << "linesize " << avPicture.linesize[0] << std::endl;
+                    // std::cout << "pixelDataNComps " << pixelDataNComps << std::endl;
+                    // std::cout << "numDestChannels " << numDestChannels << std::endl;
 
                     for (int x = 0; x < width; ++x) {
                         int srcCol = x * pixelDataNComps;
                         int dstCol = x * numDestChannels;
-                        dst_pixels[dstCol + 0] = floatToInt<256>(src_pixels[srcCol + 0]);
-                        dst_pixels[dstCol + 1] = floatToInt<256>(src_pixels[srcCol + 1]);
-                        dst_pixels[dstCol + 2] = floatToInt<256>(src_pixels[srcCol + 2]);
+                        // CHANGED
+                        // dst_pixels[dstCol + 0] = floatToInt<256>(src_pixels[srcCol + 0]);
+                        // dst_pixels[dstCol + 1] = floatToInt<256>(src_pixels[srcCol + 1]);
+                        // dst_pixels[dstCol + 2] = floatToInt<256>(src_pixels[srcCol + 2]);
+
+                        dst_pixels[dstCol + 0] = src_pixels[srcCol + 0];
+                        dst_pixels[dstCol + 1] = src_pixels[srcCol + 1];
+                        dst_pixels[dstCol + 2] = src_pixels[srcCol + 2];
                         if (hasAlpha) {
-                            dst_pixels[dstCol + 3] = floatToInt<256>( (pixelDataNComps == 4) ? src_pixels[srcCol + 3] : 1. );
+                            // CHANGED
+                            // dst_pixels[dstCol + 3] = floatToInt<256>( (pixelDataNComps == 4) ? src_pixels[srcCol + 3] : 1. );
+                            dst_pixels[dstCol + 3] = (pixelDataNComps == 4) ? src_pixels[srcCol + 3] : 1.;
                         }
                     }
-                }
+                // }
+                // CHANGED -- end
             }
 
             avFrame = av_frame_alloc(); // Create an AVFrame structure and initialise to zero.
@@ -3724,7 +3749,9 @@ int
 WriteFFmpegPlugin::writeToFile(AVFormatContext* avFormatContext,
                                bool finalise,
                                double time,
-                               const float *pixelData,
+                               // CHANGED
+                               // const float *pixelData,
+                               const unsigned char *pixelData,
                                const OfxRectI* bounds,
                                int pixelDataNComps,
                                int dstNComps,
@@ -4159,7 +4186,9 @@ void
 WriteFFmpegPlugin::encode(const string& filename,
                           const OfxTime time,
                           const string& /*viewName*/,
-                          const float *pixelData,
+                          // CHANGED
+                          // const float *pixelData,
+                          const unsigned char *pixelData,
                           const OfxRectI& bounds,
                           const float pixelAspectRatio,
                           const int pixelDataNComps,

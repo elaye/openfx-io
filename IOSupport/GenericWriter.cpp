@@ -400,7 +400,9 @@ GenericWriterPlugin::fetchPlaneConvertAndCopy(const string& plane,
                                               OfxRectI* bounds,
                                               ImageMemory** tmpMem, // owned by srcImgsHolder
                                               const Image** inputImage, // owned by srcImgsHolder
-                                              float** tmpMemPtr, // owned by srcImgsHolder
+                                              // CHANGED
+                                              // float** tmpMemPtr, // owned by srcImgsHolder
+                                              unsigned char** tmpMemPtr, // owned by srcImgsHolder
                                               int* rowBytes,
                                               PixelComponentEnum* mappedComponents,
                                               int* mappedComponentsCount)
@@ -475,7 +477,9 @@ GenericWriterPlugin::fetchPlaneConvertAndCopy(const string& plane,
         // Render window is of the same size as the input image and we don't need to apply colorspace conversion
         // or premultiplication operations.
 
-        *tmpMemPtr = (float*)srcPixelData;
+      // CHANGED
+        // *tmpMemPtr = (float*)srcPixelData;
+        *tmpMemPtr = (unsigned char*)srcPixelData;
         *rowBytes = srcRowBytes;
 
         // copy to dstImg if necessary
@@ -522,14 +526,18 @@ GenericWriterPlugin::fetchPlaneConvertAndCopy(const string& plane,
         size_t memSize = (size_t)(renderWindow.y2 - renderWindow.y1) * (size_t)tmpRowBytes;
         *tmpMem = new ImageMemory(memSize, this);
         srcImgsHolder->addMemory(*tmpMem);
-        *tmpMemPtr = (float*)(*tmpMem)->lock();
+        // CHANGED
+        // *tmpMemPtr = (float*)(*tmpMem)->lock();
+        *tmpMemPtr = (unsigned char*)(*tmpMem)->lock();
         if (!*tmpMemPtr) {
             throwSuiteStatusException(kOfxStatErrMemory);
 
             return;
         }
 
-        float* tmpPixelData = *tmpMemPtr;
+        // CHANGED
+        // float* tmpPixelData = *tmpMemPtr;
+        unsigned char* tmpPixelData = *tmpMemPtr;
 
         // Set to black and transparant so that outside the portion defined by the image there's nothing.
         if (!renderWindowIsBounds) {
@@ -667,7 +675,9 @@ GenericWriterPlugin::fetchPlaneConvertAndCopy(const string& plane,
         size_t memSize = (size_t)(renderWindow.y2 - renderWindow.y1) * (size_t)tmpRowBytes;
         ImageMemory *packingBufferMem = new ImageMemory(memSize, this);
         srcImgsHolder->addMemory(packingBufferMem);
-        float* packingBufferData = (float*)packingBufferMem->lock();
+        // CHANGED
+        // float* packingBufferData = (float*)packingBufferMem->lock();
+        unsigned char* packingBufferData = (unsigned char*)packingBufferMem->lock();
         if (!packingBufferData) {
             throwSuiteStatusException(kOfxStatErrMemory);
 
@@ -702,7 +712,9 @@ GenericWriterPlugin::fetchPlaneConvertAndCopy(const string& plane,
 
 struct ImageData
 {
-    float* srcPixelData;
+    // CHANGED
+    // float* srcPixelData;
+    unsigned char* srcPixelData;
     int rowBytes;
     OfxRectI bounds;
     PixelComponentEnum pixelComponents;
@@ -1007,11 +1019,15 @@ GenericWriterPlugin::render(const RenderArguments &args)
 
                 return;
             }
-            int pixelBytes = nChannels * getComponentBytes(eBitDepthFloat);
+            // CHANGED
+            // int pixelBytes = nChannels * getComponentBytes(eBitDepthFloat);
+            int pixelBytes = nChannels * getComponentBytes(eBitDepthUByte);
             int tmpRowBytes = (args.renderWindow.x2 - args.renderWindow.x1) * pixelBytes;
             size_t memSize = (size_t)(args.renderWindow.y2 - args.renderWindow.y1) * (size_t)tmpRowBytes;
             ImageMemory interleavedMem(memSize, this);
-            float* tmpMemPtr = (float*)interleavedMem.lock();
+            // CHANGED
+            // float* tmpMemPtr = (float*)interleavedMem.lock();
+            unsigned char* tmpMemPtr = (unsigned char*)interleavedMem.lock();
             if (!tmpMemPtr) {
                 throwSuiteStatusException(kOfxStatErrMemory);
 
@@ -1037,7 +1053,9 @@ GenericWriterPlugin::render(const RenderArguments &args)
                                            it->pixelComponentsCount,
                                            dstNCompsStartIndex,     // srcNCompsStartIndex
                                            dstNComps,     // desiredSrcNComps
-                                           eBitDepthFloat,
+                                           // CHANGED
+                                           // eBitDepthFloat,
+                                           eBitDepthUByte,
                                            it->rowBytes,
                                            args.renderWindow,     // dstBounds
                                            ePixelComponentNone,     // dstPixelComponents
@@ -1102,11 +1120,15 @@ GenericWriterPlugin::render(const RenderArguments &args)
 
                     return;
                 }
-                int pixelBytes = nChannels * getComponentBytes(eBitDepthFloat);
+                // CHANGED
+                // int pixelBytes = nChannels * getComponentBytes(eBitDepthFloat);
+                int pixelBytes = nChannels * getComponentBytes(eBitDepthUByte);
                 int tmpRowBytes = (args.renderWindow.x2 - args.renderWindow.x1) * pixelBytes;
                 size_t memSize = (size_t)(args.renderWindow.y2 - args.renderWindow.y1) * (size_t)tmpRowBytes;
                 ImageMemory interleavedMem(memSize, this);
-                float* tmpMemPtr = (float*)interleavedMem.lock();
+                // CHANGED
+                // float* tmpMemPtr = (float*)interleavedMem.lock();
+                unsigned char* tmpMemPtr = (unsigned char*)interleavedMem.lock();
                 if (!tmpMemPtr) {
                     throwSuiteStatusException(kOfxStatErrMemory);
 
@@ -1132,7 +1154,9 @@ GenericWriterPlugin::render(const RenderArguments &args)
                                                it->pixelComponentsCount,
                                                dstNCompsStartIndex,     // srcNCompsStartIndex
                                                dstNComps,     // desiredSrcNComps
-                                               eBitDepthFloat,
+                                               // CHANGED
+                                               // eBitDepthFloat,
+                                               eBitDepthUByte,
                                                it->rowBytes,
                                                args.renderWindow,
                                                ePixelComponentNone,     // dstPixelComponents
@@ -1649,7 +1673,9 @@ GenericWriterPlugin::unPremultPixelData(const OfxRectI &renderWindow,
         return;
     }
     if (dstPixelComponents == ePixelComponentRGBA) {
-        PixelCopierUnPremult<float, 4, 1, float, 4, 1> fred(*this);
+        // CHANGED
+        // PixelCopierUnPremult<float, 4, 1, float, 4, 1> fred(*this);
+        PixelCopierUnPremult<unsigned char, 4, 1, unsigned char, 4, 1> fred(*this);
         setupAndProcess(fred, 3, renderWindow, srcPixelData, srcBounds, srcPixelComponents, srcPixelComponentCount, srcPixelDepth, srcRowBytes, dstPixelData, dstBounds, dstPixelComponents, dstPixelComponentCount, dstBitDepth, dstRowBytes);
     } else {
         ///other pixel components means you want to copy only...
@@ -1682,7 +1708,9 @@ GenericWriterPlugin::premultPixelData(const OfxRectI &renderWindow,
     }
 
     if (dstPixelComponents == ePixelComponentRGBA) {
-        PixelCopierPremult<float, 4, 1, float, 4, 1> fred(*this);
+        // CHANGED
+        // PixelCopierPremult<float, 4, 1, float, 4, 1> fred(*this);
+        PixelCopierPremult<unsigned char, 4, 1, unsigned char, 4, 1> fred(*this);
         setupAndProcess(fred, 3, renderWindow, srcPixelData, srcBounds, srcPixelComponents, srcPixelComponentCount, srcPixelDepth, srcRowBytes, dstPixelData, dstBounds, dstPixelComponents, dstPixelComponentCount, dstBitDepth, dstRowBytes);
     } else {
         ///other pixel components means you want to copy only...
@@ -1784,7 +1812,9 @@ void
 GenericWriterPlugin::encode(const string& /*filename*/,
                             const OfxTime /*time*/,
                             const string& /*viewName*/,
-                            const float */*pixelData*/,
+                            // CHANGED
+                            // const float */*pixelData*/,
+                            const unsigned char */*pixelData*/,
                             const OfxRectI& /*bounds*/,
                             const float /*pixelAspectRatio*/,
                             const int /*pixelDataNComps*/,
@@ -1813,7 +1843,9 @@ GenericWriterPlugin::beginEncodeParts(void* /*user_data*/,
 void
 GenericWriterPlugin::encodePart(void* /*user_data*/,
                                 const string& /*filename*/,
-                                const float */*pixelData*/,
+                                // CHANGED
+                                // const float */*pixelData*/,
+                                const unsigned char */*pixelData*/,
                                 int /*pixelDataNComps*/,
                                 int /*planeIndex*/,
                                 int /*rowBytes*/)

@@ -183,7 +183,9 @@ protected:
     virtual void encode(const std::string& filename,
                         const OfxTime time,
                         const std::string& viewName,
-                        const float *pixelData,
+                        // CHANGED
+                        /* const float *pixelData, */
+                        const unsigned char *pixelData,
                         const OfxRectI& bounds,
                         const float pixelAspectRatio,
                         const int pixelDataNComps,
@@ -218,7 +220,9 @@ protected:
                                   const OfxRectI& bounds);
     virtual void endEncodeParts(void* /*user_data*/) {}
 
-    virtual void encodePart(void* user_data, const std::string& filename, const float *pixelData, int pixelDataNComps, int planeIndex, int rowBytes);
+    // CHANGED
+    /* virtual void encodePart(void* user_data, const std::string& filename, const float *pixelData, int pixelDataNComps, int planeIndex, int rowBytes); */
+    virtual void encodePart(void* user_data, const std::string& filename, const unsigned char *pixelData, int pixelDataNComps, int planeIndex, int rowBytes);
 
     /**
      * @brief Should return the view index needed to render.
@@ -333,7 +337,9 @@ public:
                                   OfxRectI* bounds,
                                   OFX::ImageMemory** tmpMem,
                                   const OFX::Image** inputImage,
-                                  float** tmpMemPtr,
+                                  // CHANGED
+                                  /* float** tmpMemPtr, */
+                                  unsigned char** tmpMemPtr,
                                   int* rowBytes,
                                   OFX::PixelComponentEnum* mappedComponents,
                                   int* mappedComponentsCount);
