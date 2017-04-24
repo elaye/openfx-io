@@ -449,11 +449,12 @@ GenericWriterPlugin::fetchPlaneConvertAndCopy(const string& plane,
 
     getImageData(srcImg, &srcPixelData, bounds, &pixelComponents, &bitDepth, &srcRowBytes);
 
+#ifdef OFX_IO_USING_OCIO
     if (bitDepth != eBitDepthFloat) {
         throwSuiteStatusException(kOfxStatErrFormat);
-
         return;
     }
+#endif
 
 
     // premultiplication/unpremultiplication is only useful for RGBA data
@@ -1667,7 +1668,14 @@ GenericWriterPlugin::unPremultPixelData(const OfxRectI &renderWindow,
     assert(srcPixelData && dstPixelData);
 
     // do the rendering
-    if ( (dstBitDepth != eBitDepthFloat) || ( (dstPixelComponents != ePixelComponentRGBA) && (dstPixelComponents != ePixelComponentRGB) && (dstPixelComponents != ePixelComponentAlpha) ) ) {
+    bool hasWrongComponents =  (dstPixelComponents != ePixelComponentRGBA) && (dstPixelComponents != ePixelComponentRGB) && (dstPixelComponents != ePixelComponentAlpha);
+  #ifdef OFX_IO_USING_OCIO
+    bool hasWrongBitDepth = dstBitDepth != eBitDepthFloat;
+  #else
+    bool hasWrongBitDepth = (dstBitDepth != eBitDepthFloat) && (dstBitDepth != eBitDepthUByte);
+  #endif
+
+    if ( hasWrongBitDepth || hasWrongComponents ) {
         throwSuiteStatusException(kOfxStatErrFormat);
 
         return;
@@ -1701,10 +1709,17 @@ GenericWriterPlugin::premultPixelData(const OfxRectI &renderWindow,
     assert(srcPixelData && dstPixelData);
 
     // do the rendering
-    if ( (dstBitDepth != eBitDepthFloat) || ( (dstPixelComponents != ePixelComponentRGBA) && (dstPixelComponents != ePixelComponentRGB) && (dstPixelComponents != ePixelComponentAlpha) ) ) {
-        throwSuiteStatusException(kOfxStatErrFormat);
+    bool hasWrongComponents =  (dstPixelComponents != ePixelComponentRGBA) && (dstPixelComponents != ePixelComponentRGB) && (dstPixelComponents != ePixelComponentAlpha);
+#ifdef OFX_IO_USING_OCIO
+    bool hasWrongBitDepth = dstBitDepth != eBitDepthFloat;
+#else
+    bool hasWrongBitDepth = (dstBitDepth != eBitDepthFloat) && (dstBitDepth != eBitDepthUByte);
+#endif
 
-        return;
+    if ( hasWrongBitDepth || hasWrongComponents ) {
+      throwSuiteStatusException(kOfxStatErrFormat);
+
+      return;
     }
 
     if (dstPixelComponents == ePixelComponentRGBA) {
@@ -2319,9 +2334,11 @@ GenericWriterDescribe(ImageEffectDescriptor &desc,
     desc.addSupportedContext(eContextGeneral);
 
     // OCIO is only supported for float images.
-    //desc.addSupportedBitDepth(eBitDepthUByte);
-    //desc.addSupportedBitDepth(eBitDepthUShort);
     desc.addSupportedBitDepth(eBitDepthFloat);
+#ifndef OFX_IO_USING_OCIO
+    desc.addSupportedBitDepth(eBitDepthUByte);
+    //desc.addSupportedBitDepth(eBitDepthUShort);
+#endif
 
     // set a few flags
     desc.setSingleInstance(false);
